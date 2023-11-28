@@ -28,7 +28,8 @@ Scientific Data 10, 141 doi: [10.1038/s41597-023-02048-8](https://doi.org/10.103
 
 ### Optional possibilities
 
-* **IaC**: Terraform
+* **IaC**: Cloud Development Kit for Terraform (CDKTF) or Pulumi
+* **GUI Demo App**: Gradio/Streamlit with HuggingFace?
 * **Monitoring**: Grafana (Prometheus from BentoML)
 * **BentoML Docker orchestration**: Kubernetes (or something making k8 easier)
 
@@ -38,4 +39,4 @@ See some background for decisions, and tutorials: https://github.com/petteriTeik
 
 ## TODO!
 
-See cards on [Github Projects](https://github.com/users/petteriTeikari/projects/2)
+See cards on [Github Projects](https://github.com/orgs/minivess-mlops/projects/1)
