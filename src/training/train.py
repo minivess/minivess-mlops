@@ -4,6 +4,7 @@ from copy import deepcopy
 
 import numpy as np
 import torch
+from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 from loguru import logger
 
@@ -141,6 +142,7 @@ def train_model_for_single_fold(
 
         # TODO! Re-define dataloader on each iteration of the different architecture
         #  e..g. if you want to do diverse ensembles with each submodel with different augmentation
+        # See e.g. U-Mamba paper for diverse ensembles, https://arxiv.org/abs/2401.04722
         archi_results[architecture_name] = train_model_for_single_architecture(
             fold_dataloaders=fold_dataloaders,
             cfg=cfg,
@@ -326,21 +328,20 @@ def train_n_epochs_script(
     loss_function,
     optimizer,
     lr_scheduler,
-    training_config: dict,
-    cfg: dict,
+    training_config: DictConfig,
+    cfg: DictConfig,
     start_epoch: int = 0,
     output_dir: str = None,
     repeat_idx: int = None,
     fold_name: str = None,
     repeat_name: str = None,
 ):
-    # FIXME: get this from config
-    metric_dict = {
-        "roi_size": (64, 64, 8),
-        "sw_batch_size": 4,
-        "predictor": model,
-        "overlap": 0.6,
-    }
+    # Evaluation config
+    eval_config = cfg_key(cfg, "hydra_cfg", "config", "VALIDATION")
+    metric_dict = OmegaConf.to_container(
+        eval_config["VALIDATION_PARAMS"]
+    )  # this name from MONAI docs, maybe harmonize?
+    metric_dict["predictor"] = model
 
     train_results = {}
     eval_results = {}
@@ -378,20 +379,33 @@ def train_n_epochs_script(
             scaler,
             training_config,
             train_loader=dataloaders["TRAIN"],
-            metric_dict=metric_dict,
             dataset_dummy_key="MINIVESS",
         )
 
         # Validate (as in decide whether the model improved or not)
         split_name = "VAL"
         eval_epoch_results[split_name] = evaluate_datasets_per_epoch(
-            model, device, epoch, dataloaders, training_config, metric_dict, split_name
+            model,
+            device,
+            epoch,
+            dataloaders,
+            training_config,
+            metric_dict,
+            eval_config,
+            split_name,
         )
 
         # Evaluate (check generalization for held-out datasets)
         split_name = "TEST"
         eval_epoch_results[split_name] = evaluate_datasets_per_epoch(
-            model, device, epoch, dataloaders, training_config, metric_dict, split_name
+            model,
+            device,
+            epoch,
+            dataloaders,
+            training_config,
+            metric_dict,
+            eval_config,
+            split_name,
         )
 
         # ML Tests (again)
@@ -453,7 +467,6 @@ def train_1_epoch(
     scaler,
     training_config,
     train_loader,
-    metric_dict,
     dataset_dummy_key: str = "MINIVESS",
 ):
     # https://github.com/Project-MONAI/tutorials/blob/2183d45f48c53924b291a16d72f8f0e0b29179f2/acceleration/distributed_training/brats_training_ddp.py#L317

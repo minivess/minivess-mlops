@@ -33,6 +33,7 @@ pytest = "^7.4.3"
 urllib3 = ">=1.25.4,<1.27"
 bentoml = {extras = ["aws"], version = "^1.1.8"}
 fs-s3fs = "^1.1.1"
+metricsreloaded = {git = "https://github.com/Project-MONAI/MetricsReloaded", rev = "monai-support"}
 
 
 [tool.poetry.group.lint.dependencies]

@@ -266,14 +266,20 @@ config:
     # model based on Dice, on Hausdorff distance, metric X, you would have three models per dataset
     # and if you have Minivess and DatasetB on your VAL split, you would be saving and tracking 3 x 2 "best models"
     METRICS_TO_TRACK:
-      - 'dice'
-      #- 'dice_batch'
+      # From Metrics Reloaded for tubular data
+      # MetricsReloaded/MetricsReloaded/metrics/pairwise_measures.py
+      Overlap:
+        - 'cldice' # 'CentreLineDSC'
+      Boundary:
+        - 'nsd' # Normalised Surface Distance, "NSD"
     # maybe there is a better way, but when saving the models, we need to know if larger or smaller value
     # is considered better, so as many entries as above, DICE score better when higher, distances then would be
     # better as smaller, as would a loss be
     METRICS_TO_TRACK_OPERATORS:
-      - 'max'
-      #- 'max'
+      Overlap:
+        - 'max'
+      Boundary:
+        - 'min'
     # Do not track change for these n epochs at all if your first epochs have noisy metrics
     NO_WARMUP_EPOCHS: 0
     # You could smooth the metric curve if again you get noisy / spurious metrics, and get those
@@ -303,8 +309,8 @@ config:
     # This "VALIDATION_BEST" controls the inference done for best model after each repeat,
     # for ensemble of models, etc.
     METRICS:
-      - 'dice'
-      - 'hausdorff'
+      - 'CentreLineDSC'
+      - 'NSD'
     METRICS_OPERATORS:
       # which is better, higher (max) or lower (min) value for this metric (see above)
       - 'max'
@@ -345,6 +351,9 @@ config:
       to_onehot_y: False
       sigmoid: True
       batch: True
+    # U-Mamba paper, https://arxiv.org/abs/2401.04722
+    DiceCELoss:
+      squared_pred: False
 
   # ----------------------------------------------------------------------------------- #
   # OPTIMIZERS
@@ -434,12 +443,13 @@ config:
 
   # ----------------------------------------------------------------------------------- #
   # SERVICES
-  # refactor to be a separate .yaml
+  # refactor to be a separate .yaml eventually
   # ----------------------------------------------------------------------------------- #
   SERVICES:
     # These can be obviously very different for different orgs and different users
     MLFLOW:
       # server_URI: https://dagshub.com/petteriTeikari/minivess_mlops.mlflow
+      #             was a bit glitchy, especially with the model registry
       # server_URI: null  # LOCAL MLFlow
       server_URI: 'http://ec2-13-49-76-78.eu-north-1.compute.amazonaws.com:5000/'
     DVC:
