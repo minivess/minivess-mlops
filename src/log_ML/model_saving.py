@@ -33,7 +33,8 @@ def save_models_if_improved(
     if epoch >= validation_config["NO_WARMUP_EPOCHS"]:
         for dataset in eval_epoch_results["VAL"].keys():
             best_dicts_out[dataset] = {}
-            for m_idx, metric in enumerate(validation_config["METRICS_TO_TRACK"]):
+            metrics_tracked = list(eval_results[split_key][dataset]["scalars"].keys())
+            for m_idx, metric in enumerate(metrics_tracked):
                 best_dicts_out[dataset][metric] = {}
 
                 # i.e. the first epoch that we are tracking so obviously the model is now considered having
@@ -93,7 +94,7 @@ def save_models_if_improved(
                         epoch=epoch,
                         split_key=split_key,
                         results_type=results_type,
-                        best_op=validation_config["METRICS_TO_TRACK_OPERATORS"][m_idx],
+                        best_op=validation_config["METRICS_OPERATORS"][m_idx],
                     )
 
                     if model_improved:
@@ -153,8 +154,8 @@ def check_if_value_improved(
     results_type: str = "scalars",
     best_op: str = "max",
 ):
-    assert len(validation_config["METRICS_TO_TRACK"]) == len(
-        validation_config["METRICS_TO_TRACK_OPERATORS"]
+    assert len(validation_config["METRICS"]) == len(
+        validation_config["METRICS_OPERATORS"]
     ), (
         "You should have as many metrics (e.g. Dice, Hausdorff Distance) "
         'as you have the "operators" indicating what is better (e.g. "max", "min")\n'
@@ -203,7 +204,13 @@ def get_current_metric_value(
         raise NotImplementedError("Implement Exponential Moving Average")
 
     else:
-        value = eval_epoch_results[split_key][dataset][results_type][metric]
+        try:
+            value = eval_results[split_key][dataset][results_type][metric][epoch]
+        except KeyError as e:
+            logger.error(
+                "Problem getting metric value from eval_results, e = {}, "
+                "trying to get from eval_epoch_results".format(e)
+            )
 
     return value
 

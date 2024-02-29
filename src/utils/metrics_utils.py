@@ -1,4 +1,6 @@
 import os
+
+import numpy as np
 from loguru import logger
 import monai
 from monai.handlers import MetricsReloadedBinaryHandler
@@ -82,8 +84,39 @@ def init_metrics_reloaded_dict(y_pred, y_pred_proba, y, metadata):
 
         return y_pred, y_pred_proba, y
 
+    def convert_numpy_to_list_of_tensors(array_in):
+        assert len(array_in.shape) == 4, "Should be a 4D tensor, not {}".format(
+            len(array_in.shape)
+        )
+        tensors_out: list = []
+        no_batches = array_in.shape[0]
+        for b in range(no_batches):
+            tensors_out.append(array_in[b, :, :, :])
+        return tensors_out
+
+    def convert_numpy_arrays_to_list_of_tensors(y_pred, y_pred_proba, y):
+        y_pred = convert_numpy_to_list_of_tensors(array_in=y_pred)
+        y_pred_proba = convert_numpy_to_list_of_tensors(array_in=y_pred_proba)
+        y = convert_numpy_to_list_of_tensors(array_in=y)
+        return y_pred, y_pred_proba, y
+
     paths, names = get_paths_and_fnames(metadata)
-    y_pred, y_pred_proba, y = convert_tensor_to_list_of_tensors(y_pred, y_pred_proba, y)
+    if isinstance(y_pred, monai.data.MetaTensor):
+        # during training, these are MetaTensors
+        y_pred, y_pred_proba, y = convert_tensor_to_list_of_tensors(
+            y_pred, y_pred_proba, y
+        )
+    else:
+        # during ensembling, these are numpy arrays
+        if isinstance(y_pred, np.ndarray):
+            y_pred, y_pred_proba, y = convert_numpy_arrays_to_list_of_tensors(
+                y_pred, y_pred_proba, y
+            )
+        else:
+            logger.error("y_pred is not a numpy array, but a {}".format(type(y_pred)))
+            raise TypeError(
+                "y_pred is not a numpy array, but a {}".format(type(y_pred))
+            )
 
     dict_file = {}
     dict_file["pred_loc"] = y_pred
@@ -98,3 +131,16 @@ def init_metrics_reloaded_dict(y_pred, y_pred_proba, y, metadata):
     dict_file["names"] = names
 
     return dict_file
+
+
+def get_metrics_to_eval(eval_config):
+    metrics_to_eval = {}
+    for i, metric_type in enumerate(eval_config["METRICS"]):
+        metrics_to_eval[metric_type] = []
+        for j, metric_name in enumerate(eval_config["METRICS"][metric_type]):
+            _ = check_metric_validity(
+                metric_name=metric_name
+            )  # do only once somewhere before?
+            metrics_to_eval[metric_type].append(metric_name)
+
+    return metrics_to_eval

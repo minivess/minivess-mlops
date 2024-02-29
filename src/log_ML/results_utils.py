@@ -36,7 +36,7 @@ def find_best_repeat(
         """
         This now breaks easily as we should have some LUT for each possible metric, or
         define these already in the config. i.e. is smaller or larger value better.
-        You could use the "METRICS_TO_TRACK_OPERATORS" in config['VALIDATION']
+        You could use the "METRICS_OPERATORS" in config['VALIDATION']
         :return:
         """
         if "loss" in var_name:

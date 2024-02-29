@@ -302,6 +302,8 @@ class ModelEnsemble(mlflow.pyfunc.PythonModel):
         sample_ensemble_metrics = get_inference_metrics(
             ensemble_stat_results=ensemble_stat_results,
             y_pred=ensemble_stat_results["arrays"]["mask"],
+            y_pred_proba=ensemble_stat_results["arrays"]["mean"],
+            metadata=batch_data["metadata"],
             eval_config=self.eval_config,
             batch_data=batch_data,
         )

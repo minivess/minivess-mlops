@@ -5,16 +5,16 @@ import pandas as pd
 import torch
 from loguru import logger
 
-from MetricsReloaded.processes.overall_process import ProcessEvaluation
 
 # from monai.data import decollate_batch
 from monai.inferers import sliding_window_inference
 from monai.transforms import Activations, AsDiscrete, Compose
 
+from src.inference.metrics import get_sample_metrics_from_np_arrays
 from src.utils.metrics_utils import (
-    init_metrics_reloaded_dict,
     check_metric_validity,
     check_metric_types,
+    get_metrics_to_eval,
 )
 from src.utils.train_utils import init_epoch_dict, get_timings_per_epoch
 
@@ -119,53 +119,20 @@ def get_epoch_metrics(epoch_metrics_per_dataset, batch_evals):
 def evaluate_batch(
     y_pred, y_pred_proba, y, metadata, device, batch_sz, batch_evals, eval_config
 ):
-    metrics_to_eval = {}
-    for i, metric_type in enumerate(eval_config["METRICS_TO_TRACK"]):
-        metrics_to_eval[metric_type] = []
-        for j, (metric_name, direction) in enumerate(
-            zip(
-                eval_config["METRICS_TO_TRACK"][metric_type],
-                eval_config["METRICS_TO_TRACK_OPERATORS"][metric_type],
-            )
-        ):
-            _ = check_metric_validity(
-                metric_name=metric_name
-            )  # do only once somewhere before?
-            metrics_to_eval[metric_type].append(metric_name)
-
+    metrics_to_eval = get_metrics_to_eval(eval_config)
     measures_overlap, measures_boundary = check_metric_types(
         metrics_to_eval=metrics_to_eval
     )
 
-    # Prepare dict for Metrics Reloaded
-    dict_file = init_metrics_reloaded_dict(y_pred, y_pred_proba, y, metadata)
-
-    # https://github.com/Project-MONAI/MetricsReloaded/blob/b3a371503f8417839d67b073732170ac01ed03f7/examples/example_ilc.py#L16
-    # https://github.com/Project-MONAI/tutorials/blob/1783005849df6129dc389ee3e537851bc44ab10d/modules/metrics_reloaded/unet_evaluation.py#L146
-    # Run MetricsReloaded evaluation process
-    # Is there a way to suppress the stdout?
-    PE = ProcessEvaluation(
-        dict_file,
-        "SemS",
-        localization="mask_iou",
-        file=dict_file["file"],
-        flag_map=True,
-        assignment="greedy_matching",
-        measures_overlap=measures_overlap,
-        measures_boundary=measures_boundary,
-        case=True,
-        thresh_ass=0.000001,
+    PE, _ = get_sample_metrics_from_np_arrays(
+        y_pred,
+        y_pred_proba,
+        y,
+        metadata,
+        eval_config,
+        measures_overlap,
+        measures_boundary,
     )
-
-    # PE.resseg now has multiple samples per file due to the sliding window inference
-    # see "case" column
-
-    # Save results as CSV
-    # PE.resseg.to_csv("results_metrics_reloaded.csv")
-
-    # TODO! "Non-standard" soft Dice confidence (SDC) from "Selective Prediction for Semantic Segmentation
-    #  using Post-Hoc Confidence Estimation and Its Performance under Distribution Shift"
-    #  https://arxiv.org/abs/2402.10665
 
     if len(batch_evals) == 0:
         # first batch

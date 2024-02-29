@@ -15,8 +15,10 @@ from src.inference.ensemble_utils import (
 from src.inference.metrics import (
     get_sample_metrics_from_np_masks,
     get_sample_uq_metrics_from_ensemble_stats,
+    get_sample_metrics_from_np_arrays,
 )
 from src.log_ML.model_saving import import_model_from_path
+from src.utils.metrics_utils import get_metrics_to_eval, check_metric_types
 
 
 def inference_sample(
@@ -151,6 +153,8 @@ def inference_best_repeat(
 
 def get_inference_metrics(
     y_pred: np.ndarray,
+    y_pred_proba: np.ndarray,
+    metadata: dict,
     eval_config: dict,
     batch_data: dict,
     ensemble_stat_results: dict = None,
@@ -159,8 +163,27 @@ def get_inference_metrics(
         # cannot compute any supervised metrics, if the label (segmentation mask) does not come with the image data
         x = conv_metatensor_to_numpy(batch_data["image"])
         y = ground_truth = conv_metatensor_to_numpy(batch_data["label"])
-        ensemble_metrics = get_sample_metrics_from_np_masks(
-            x, y, y_pred, eval_config=eval_config
+
+        metrics_to_eval = get_metrics_to_eval(eval_config)
+        measures_overlap, measures_boundary = check_metric_types(
+            metrics_to_eval=metrics_to_eval
+        )
+        y_pred, y_pred_proba, y, x = remove_batch_from_arrays(
+            y_pred, y_pred_proba, y, x
+        )
+        PE, timing_metrics = get_sample_metrics_from_np_arrays(
+            y_pred,
+            y_pred_proba,
+            y,
+            metadata,
+            eval_config,
+            measures_overlap,
+            measures_boundary,
+            x=x,
+        )
+
+        ensemble_metrics = match_PE_metrics_to_ensemble_metrics(
+            PE, metadata, timing_metrics
         )
 
         if ensemble_stat_results is not None:
@@ -182,6 +205,20 @@ def get_inference_metrics(
     return ensemble_metrics
 
 
+def match_PE_metrics_to_ensemble_metrics(PE, metadata, timing_metrics):
+    ensemble_metrics = {"metrics": {}}
+    resseg = PE.resseg
+    metric_names = list(resseg.columns)
+    metric_names.remove("case")
+    metric_names.remove("label")
+    for metric_name in metric_names:
+        ensemble_metrics["metrics"][metric_name] = resseg[metric_name].values
+    # ensemble_metrics["timing"] = timing_metrics
+    # ensemble_metrics["metadata"] = metadata
+
+    return ensemble_metrics
+
+
 def inference_per_batch(
     image_tensor: MetaTensor, filenames: list, batch_data: dict, model, cfg: dict
 ):
@@ -199,3 +236,21 @@ def inference_per_batch(
     )
 
     # inference_per_volume
+
+
+def remove_batch_from_arrays(y_pred, y_pred_proba, y, x):
+    # remove the batch dimension
+    assert len(y_pred.shape) == 5, "y_pred should be 5D, not {}D".format(
+        len(y_pred.shape)
+    )
+    y_pred = y_pred[0, :, :, :]
+    assert len(y_pred_proba.shape) == 5, "y_pred_proba should be 5D, not {}D".format(
+        len(y_pred_proba.shape)
+    )
+    y_pred_proba = y_pred_proba[0, :, :, :]
+    assert len(x.shape) == 5, "x should be 5D, not {}D".format(len(x.shape))
+    x = x[0, :, :, :]
+    assert len(y.shape) == 5, "y should be 5D, not {}D".format(len(y.shape))
+    y = y[0, :, :, :]
+
+    return y_pred, y_pred_proba, y, x

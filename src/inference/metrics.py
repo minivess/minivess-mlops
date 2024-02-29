@@ -1,5 +1,7 @@
 import numpy as np
 import time
+
+from MetricsReloaded.processes.overall_process import ProcessEvaluation
 from loguru import logger
 
 import torch
@@ -7,11 +9,62 @@ from monai.metrics import compute_hausdorff_distance, compute_generalized_dice
 from monai.utils import convert_to_tensor
 from monai.networks.utils import one_hot
 
+from src.utils.metrics_utils import init_metrics_reloaded_dict
+
+
+def get_sample_metrics_from_np_arrays(
+    y_pred,
+    y_pred_proba,
+    y,
+    metadata,
+    eval_config,
+    measures_overlap,
+    measures_boundary,
+    x: np.ndarray = None,
+):
+    dict_file = init_metrics_reloaded_dict(y_pred, y_pred_proba, y, metadata)
+
+    # https://github.com/Project-MONAI/MetricsReloaded/blob/b3a371503f8417839d67b073732170ac01ed03f7/examples/example_ilc.py#L16
+    # https://github.com/Project-MONAI/tutorials/blob/1783005849df6129dc389ee3e537851bc44ab10d/modules/metrics_reloaded/unet_evaluation.py#L146
+    # Run MetricsReloaded evaluation process
+    # Is there a way to suppress the stdout?
+    t0 = time.time()
+    PE = ProcessEvaluation(
+        dict_file,
+        "SemS",
+        localization="mask_iou",
+        file=dict_file["file"],
+        flag_map=True,
+        assignment="greedy_matching",
+        measures_overlap=measures_overlap,
+        measures_boundary=measures_boundary,
+        case=True,
+        thresh_ass=0.000001,
+    )
+    timing_metrics = np.array([time.time() - t0])
+
+    # PE.resseg now has multiple samples per file due to the sliding window inference
+    # see "case" column
+
+    # Save results as CSV
+    # PE.resseg.to_csv("results_metrics_reloaded.csv")
+
+    # TODO! "Non-standard" soft Dice confidence (SDC) from "Selective Prediction for Semantic Segmentation
+    #  using Post-Hoc Confidence Estimation and Its Performance under Distribution Shift"
+    #  https://arxiv.org/abs/2402.10665
+
+    return PE, timing_metrics
+
+
+# Non-Metrics Reloaded functions, maybe to be deprecated
+
 
 def get_sample_metrics_from_np_masks(
     x: np.ndarray,
     y: np.ndarray,
     y_pred: np.ndarray,
+    y_pred_proba: np.ndarray,
+    metadata: dict,
     eval_config: dict,
     include_background: bool = False,
     debug_mode: bool = True,
@@ -57,7 +110,7 @@ def get_sample_metrics_from_np_masks(
 
     if metrics_computed == 0:
         logger.warning(
-            "No metrics computed after re-inference, is your config file correct with these"
+            "No metrics computed after re-inference, is your config file correct with thes e"
             "metrics to be computed:\n{}".format(eval_config["METRICS"])
         )
 
@@ -106,7 +159,7 @@ def prepare_for_metrics(y, y_pred, x):
 
 
 def get_sample_uq_metrics_from_ensemble_stats(ensemble_stat_results):
-    sample_metrics = {"metrics": {}, "timing": {}}
+    sample_metrics = {"metrics": {}}
 
     # t0 = time.time()
     # metric = 'meanVar'  # quick'n'dirty estimate on how different are the predictions between repeats (submodels)
