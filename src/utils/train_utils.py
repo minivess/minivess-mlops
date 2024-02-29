@@ -3,7 +3,7 @@ from copy import deepcopy
 from loguru import logger
 import numpy as np
 import torch
-from monai.losses import DiceFocalLoss
+from monai.losses import DiceFocalLoss, DiceCELoss
 from monai.optimizers import Novograd
 from omegaconf import DictConfig
 
@@ -19,11 +19,14 @@ def check_for_params_dict(cfg_tmp, name):
 
 
 def choose_loss_function(training_config: dict, loss_config: dict):
+    # TODO! Make this automagic for all possible MONAI losses without the extra if-else
     try:
         loss_name = loss_config["NAME"]
         loss_params = check_for_params_dict(cfg_tmp=loss_config, name=loss_name)
         if loss_name == "DiceFocalLoss":
             loss_function = DiceFocalLoss(**loss_params)
+        elif loss_name == "DiceCELoss":
+            loss_function = DiceCELoss(**loss_params)
         else:
             raise NotImplementedError('Unsupported loss_name = "{}"'.format(loss_name))
     except Exception as e:

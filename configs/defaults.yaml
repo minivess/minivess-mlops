@@ -172,6 +172,9 @@ config:
       # the dataset, rather than here (even though these are input arguments to the model)
       in_channels: 1
       out_channels: 1
+    # nnUnet?
+    # U-Mamba?
+    # SAM Medical with point queries?
 
 
   # ----------------------------------------------------------------------------------- #
@@ -198,7 +201,7 @@ config:
       NUM_EPOCHS: 2
       LR: 0.0001 # 1e-4 FIXME! Parse scientifc notations from .yaml correctly
       LOSS:
-        NAME: 'DiceLoss'
+        NAME: 'DiceCELoss'
         PARAMS:
           sigmoid: True
       OPTIMIZER:
@@ -211,7 +214,7 @@ config:
       NUM_EPOCHS: 2
       LR: 0.0001 # 1e-4 FIXME! Parse scientifc notations from .yaml correctly
       LOSS:
-        NAME: 'DiceFocalLoss'
+        NAME: 'DiceCELoss' # 'DiceFocalLoss'
         PARAMS:
           placeholder: 0
       OPTIMIZER:
@@ -231,7 +234,7 @@ config:
       NUM_EPOCHS: 2
       LR: 0.0001 # 1e-4 FIXME! Parse scientifc notations from .yaml correctly
       LOSS:
-        NAME: 'DiceFocalLoss'
+        NAME: 'DiceCELoss' # 'DiceFocalLoss'
       OPTIMIZER:
         NAME: 'Novograd'
       SCHEDULER:
@@ -275,6 +278,7 @@ config:
     # maybe there is a better way, but when saving the models, we need to know if larger or smaller value
     # is considered better, so as many entries as above, DICE score better when higher, distances then would be
     # better as smaller, as would a loss be
+    # Metrics Reloaded knows the best direction, see if this can be removed
     METRICS_TO_TRACK_OPERATORS:
       Overlap:
         - 'max'
@@ -309,12 +313,17 @@ config:
     # This "VALIDATION_BEST" controls the inference done for best model after each repeat,
     # for ensemble of models, etc.
     METRICS:
-      - 'CentreLineDSC'
-      - 'NSD'
+      # From Metrics Reloaded for tubular data
+      # MetricsReloaded/MetricsReloaded/metrics/pairwise_measures.py
+      Overlap:
+        - 'cldice' # 'CentreLineDSC'
+      Boundary:
+        - 'nsd' # Normalised Surface Distance, "NSD"
     METRICS_OPERATORS:
-      # which is better, higher (max) or lower (min) value for this metric (see above)
-      - 'max'
-      - 'min'
+      Overlap:
+        - 'max'
+      Boundary:
+        - 'min'
 
   # ----------------------------------------------------------------------------------- #
   # ENSEMBLE
